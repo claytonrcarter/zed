@@ -667,27 +667,25 @@ impl LanguageRegistry {
                 Some(filename) => filename,
                 None => return 0,
             };
-            let matching_default_suffix = config.path_suffixes.iter().fold(None, |acc, suffix| {
+
+            let matching_default_suffix_len = config.path_suffixes.iter().fold(0, |acc, suffix| {
                 let ext = ".".to_string() + suffix;
-                let is_matched = filename.ends_with(&ext) || filename == suffix;
-                match (is_matched, &acc) {
-                    (true, None) => Some(suffix),
-                    (true, Some(s)) if suffix.len() > s.len() => Some(suffix),
-                    (true, Some(_)) | (false, Some(_)) | (false, None) => acc,
+                if filename.ends_with(&ext) || filename == suffix {
+                    acc.max(suffix.len())
+                } else {
+                    acc
                 }
             });
+
             let custom_suffixes = user_file_types
                 .and_then(|types| types.get(language_name.as_ref()))
                 .unwrap_or(&empty);
-            let matching_custom_suffixes = custom_suffixes.0.matches(filename);
-            let matching_custom_suffix = matching_custom_suffixes
+            let matching_custom_suffix_len = custom_suffixes
+                .0
+                .matches(filename)
                 .iter()
                 .filter_map(|i| custom_suffixes.1.get(*i))
-                .fold(None, |acc, suffix| match acc {
-                    None => Some(suffix),
-                    Some(s) if suffix.len() > s.len() => Some(suffix),
-                    Some(_) => acc,
-                });
+                .fold(0, |acc, suffix| acc.max(suffix.len()));
 
             let content_matches = content.zip(config.first_line_pattern.as_ref()).map_or(
                 false,
@@ -699,21 +697,13 @@ impl LanguageRegistry {
                 },
             );
 
-            match (matching_default_suffix, matching_custom_suffix) {
-                (Some(default_suffix), Some(custom_suffix)) => {
-                    let default_len = default_suffix.len();
-                    let custom_len = custom_suffix.len();
-
-                    if custom_len == default_len {
-                        custom_len + 1
-                    } else {
-                        default_len.max(custom_len)
-                    }
-                }
-                (Some(default_suffix), None) => default_suffix.len(),
-                (None, Some(custom_suffix)) => custom_suffix.len(),
-                (None, None) if content_matches => 1,
-                (None, None) => 0,
+            if matching_default_suffix_len > 0 || matching_custom_suffix_len > 0 {
+                // in the event of a tie, the user settings should "win" (hence the +1)
+                matching_default_suffix_len.max(matching_custom_suffix_len + 1)
+            } else if content_matches {
+                1
+            } else {
+                0
             }
         })
     }
