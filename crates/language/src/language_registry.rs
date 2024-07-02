@@ -656,11 +656,11 @@ impl LanguageRegistry {
         self: &Arc<Self>,
         path: &Path,
         content: Option<&Rope>,
-        user_file_types: Option<&HashMap<Arc<str>, GlobSet>>,
+        user_file_types: Option<&HashMap<Arc<str>, (GlobSet, Vec<String>)>>,
     ) -> Option<AvailableLanguage> {
         let filename = path.file_name().and_then(|name| name.to_str());
         // TODO confirm that this works with JSONC https://github.com/zed-industries/zed/pull/12655
-        let empty = GlobSet::empty();
+        let empty = (GlobSet::empty(), Vec::new());
 
         self.find_matching_language(move |language_name, config| {
             let filename = match filename {
@@ -676,11 +676,19 @@ impl LanguageRegistry {
                     (true, Some(_)) | (false, Some(_)) | (false, None) => acc,
                 }
             });
-            let path_matches_custom_suffix = user_file_types
-                .and_then(|types| language_name.as_ref())
-                .unwrap_or(&empty)
-                // was ... filename.ends_with(suffix);
-                .is_match(filename);
+            let custom_suffixes = user_file_types
+                .and_then(|types| types.get(language_name.as_ref()))
+                .unwrap_or(&empty);
+            let matching_custom_suffixes = custom_suffixes.0.matches(filename);
+            let matching_custom_suffix = matching_custom_suffixes
+                .iter()
+                .filter_map(|i| custom_suffixes.1.get(*i))
+                .fold(None, |acc, suffix| match acc {
+                    None => Some(suffix),
+                    Some(s) if suffix.len() > s.len() => Some(suffix),
+                    Some(_) => acc,
+                });
+
             let content_matches = content.zip(config.first_line_pattern.as_ref()).map_or(
                 false,
                 |(content, pattern)| {
@@ -690,14 +698,22 @@ impl LanguageRegistry {
                     pattern.is_match(&text)
                 },
             );
-            if path_matches_custom_suffix {
-                usize::MAX
-            } else if let Some(matched_suffix) = matching_default_suffix {
-                matched_suffix.len()
-            } else if content_matches {
-                1
-            } else {
-                0
+
+            match (matching_default_suffix, matching_custom_suffix) {
+                (Some(default_suffix), Some(custom_suffix)) => {
+                    let default_len = default_suffix.len();
+                    let custom_len = custom_suffix.len();
+
+                    if custom_len == default_len {
+                        custom_len + 1
+                    } else {
+                        default_len.max(custom_len)
+                    }
+                }
+                (Some(default_suffix), None) => default_suffix.len(),
+                (None, Some(custom_suffix)) => custom_suffix.len(),
+                (None, None) if content_matches => 1,
+                (None, None) => 0,
             }
         })
     }

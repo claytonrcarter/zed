@@ -63,7 +63,7 @@ pub struct AllLanguageSettings {
     pub inline_completions: InlineCompletionSettings,
     defaults: LanguageSettings,
     languages: HashMap<LanguageName, LanguageSettings>,
-    pub(crate) file_types: HashMap<Arc<str>, GlobSet>,
+    pub(crate) file_types: HashMap<Arc<str>, (GlobSet, Vec<String>)>,
 }
 
 /// The settings for a particular language.
@@ -1004,7 +1004,7 @@ impl settings::Settings for AllLanguageSettings {
             .and_then(|c| c.disabled_globs.as_ref())
             .ok_or_else(Self::missing_default)?;
 
-        let mut file_types: HashMap<Arc<str>, GlobSet> = HashMap::default();
+        let mut file_types: HashMap<Arc<str>, (GlobSet, Vec<String>)> = HashMap::default();
 
         for (language, suffixes) in &default_value.file_types {
             let mut builder = GlobSetBuilder::new();
@@ -1013,7 +1013,7 @@ impl settings::Settings for AllLanguageSettings {
                 builder.add(Glob::new(suffix)?);
             }
 
-            file_types.insert(language.clone(), builder.build()?);
+            file_types.insert(language.clone(), (builder.build()?, suffixes.clone()));
         }
 
         for user_settings in sources.customizations() {
@@ -1068,7 +1068,7 @@ impl settings::Settings for AllLanguageSettings {
                     builder.add(Glob::new(suffix)?);
                 }
 
-                file_types.insert(language.clone(), builder.build()?);
+                file_types.insert(language.clone(), (builder.build()?, suffixes.clone()));
             }
         }
 
