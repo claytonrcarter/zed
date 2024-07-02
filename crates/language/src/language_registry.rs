@@ -1,6 +1,7 @@
 use crate::{
     language_settings::{
-        all_language_settings, AllLanguageSettingsContent, LanguageSettingsContent,
+        all_language_settings, AllLanguageSettingsContent, LanguageCustomFileTypes,
+        LanguageSettingsContent,
     },
     task_context::ContextProvider,
     with_parser, CachedLspAdapter, File, Language, LanguageConfig, LanguageId, LanguageMatcher,
@@ -656,11 +657,14 @@ impl LanguageRegistry {
         self: &Arc<Self>,
         path: &Path,
         content: Option<&Rope>,
-        user_file_types: Option<&HashMap<Arc<str>, (GlobSet, Vec<String>)>>,
+        user_file_types: Option<&HashMap<Arc<str>, LanguageCustomFileTypes>>,
     ) -> Option<AvailableLanguage> {
         let filename = path.file_name().and_then(|name| name.to_str());
         // TODO confirm that this works with JSONC https://github.com/zed-industries/zed/pull/12655
-        let empty = (GlobSet::empty(), Vec::new());
+        let empty = LanguageCustomFileTypes {
+            glob: GlobSet::empty(),
+            patterns: Vec::new(),
+        };
 
         self.find_matching_language(move |language_name, config| {
             let filename = match filename {
@@ -681,10 +685,10 @@ impl LanguageRegistry {
                 .and_then(|types| types.get(language_name.as_ref()))
                 .unwrap_or(&empty);
             let matching_custom_suffix_len = custom_suffixes
-                .0
+                .glob
                 .matches(filename)
                 .iter()
-                .filter_map(|i| custom_suffixes.1.get(*i))
+                .filter_map(|i| custom_suffixes.patterns.get(*i))
                 .fold(0, |acc, suffix| acc.max(suffix.len()));
 
             let content_matches = content.zip(config.first_line_pattern.as_ref()).map_or(
