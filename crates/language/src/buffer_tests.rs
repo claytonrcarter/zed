@@ -202,7 +202,7 @@ async fn test_language_for_file_with_custom_file_types(cx: &mut TestAppContext) 
         LanguageConfig {
             name: "TypeScript".into(),
             matcher: LanguageMatcher {
-                path_suffixes: vec!["js".to_string()],
+                path_suffixes: vec!["ts".to_string()],
                 ..Default::default()
             },
             ..Default::default()
@@ -236,9 +236,19 @@ async fn test_language_for_file_with_custom_file_types(cx: &mut TestAppContext) 
     }
 
     let language = cx
+        .read(|cx| languages.language_for_file(&file("foo.ts"), None, cx))
+        .await
+        .unwrap();
+    assert_eq!(language.name().as_ref(), "TypeScript");
+    let language = cx
         .read(|cx| languages.language_for_file(&file("foo.js"), None, cx))
         .unwrap();
     assert_eq!(language.name(), "TypeScript".into());
+    let language = cx
+        .read(|cx| languages.language_for_file(&file("foo.cpp"), None, cx))
+        .await
+        .unwrap();
+    assert_eq!(language.name().as_ref(), "C++");
     let language = cx
         .read(|cx| languages.language_for_file(&file("foo.c"), None, cx))
         .unwrap();
