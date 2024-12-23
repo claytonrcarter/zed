@@ -94,6 +94,17 @@ fn test_select_language(cx: &mut App) {
         },
         Some(tree_sitter_rust::LANGUAGE.into()),
     )));
+    registry.add(Arc::new(Language::new(
+        LanguageConfig {
+            name: "Rust with longer extension".into(),
+            matcher: LanguageMatcher {
+                path_suffixes: vec!["foo.rs".to_string()],
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        Some(tree_sitter_rust::language()),
+    )));
 
     // matching file extension
     assert_eq!(
@@ -101,6 +112,13 @@ fn test_select_language(cx: &mut App) {
             .language_for_file(&file("src/lib.rs"), None, cx)
             .map(|l| l.name()),
         Some("Rust".into())
+    );
+    assert_eq!(
+        registry
+            .language_for_file(&file("src/lib.foo.rs"), None, cx)
+            .now_or_never()
+            .and_then(|l| Some(l.ok()?.name())),
+        Some("Rust with longer extension".into())
     );
     assert_eq!(
         registry
@@ -175,6 +193,7 @@ async fn test_first_line_pattern(cx: &mut TestAppContext) {
 
 #[gpui::test]
 async fn test_language_for_file_with_custom_file_types(cx: &mut TestAppContext) {
+    // TODO
     cx.update(|cx| {
         init_settings(cx, |settings| {
             settings.file_types.extend([

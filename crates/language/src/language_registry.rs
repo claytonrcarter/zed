@@ -31,7 +31,7 @@ use sum_tree::Bias;
 use text::{Point, Rope};
 use theme::Theme;
 use unicase::UniCase;
-use util::{maybe, paths::PathExt, post_inc, ResultExt};
+use util::{maybe, post_inc, ResultExt};
 
 #[derive(
     Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
@@ -659,22 +659,28 @@ impl LanguageRegistry {
         user_file_types: Option<&HashMap<Arc<str>, GlobSet>>,
     ) -> Option<AvailableLanguage> {
         let filename = path.file_name().and_then(|name| name.to_str());
-        let extension = path.extension_or_hidden_file_name();
-        let path_suffixes = [extension, filename, path.to_str()];
+        // TODO confirm that this works with JSONC https://github.com/zed-industries/zed/pull/12655
         let empty = GlobSet::empty();
 
         self.find_matching_language(move |language_name, config| {
-            let path_matches_default_suffix = config
-                .path_suffixes
-                .iter()
-                .any(|suffix| path_suffixes.contains(&Some(suffix.as_str())));
-            let custom_suffixes = user_file_types
-                .and_then(|types| types.get(language_name.as_ref()))
-                .unwrap_or(&empty);
-            let path_matches_custom_suffix = path_suffixes
-                .iter()
-                .map(|suffix| suffix.unwrap_or(""))
-                .any(|suffix| custom_suffixes.is_match(suffix));
+            let filename = match filename {
+                Some(filename) => filename,
+                None => return 0,
+            };
+            let matching_default_suffix = config.path_suffixes.iter().fold(None, |acc, suffix| {
+                let ext = ".".to_string() + suffix;
+                let is_matched = filename.ends_with(&ext) || filename == suffix;
+                match (is_matched, &acc) {
+                    (true, None) => Some(suffix),
+                    (true, Some(s)) if suffix.len() > s.len() => Some(suffix),
+                    (true, Some(_)) | (false, Some(_)) | (false, None) => acc,
+                }
+            });
+            let path_matches_custom_suffix = user_file_types
+                .and_then(|types| language_name.as_ref())
+                .unwrap_or(&empty)
+                // was ... filename.ends_with(suffix);
+                .is_match(filename);
             let content_matches = content.zip(config.first_line_pattern.as_ref()).map_or(
                 false,
                 |(content, pattern)| {
@@ -685,8 +691,10 @@ impl LanguageRegistry {
                 },
             );
             if path_matches_custom_suffix {
-                2
-            } else if path_matches_default_suffix || content_matches {
+                usize::MAX
+            } else if let Some(matched_suffix) = matching_default_suffix {
+                matched_suffix.len()
+            } else if content_matches {
                 1
             } else {
                 0
