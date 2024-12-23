@@ -672,6 +672,9 @@ impl LanguageRegistry {
                 None => return 0,
             };
 
+            // dbg!(&filename);
+            // dbg!(&language_name);
+
             let matching_default_suffix_len = config.path_suffixes.iter().fold(0, |acc, suffix| {
                 let ext = ".".to_string() + suffix;
                 if filename.ends_with(&ext) || filename == suffix {
@@ -684,12 +687,29 @@ impl LanguageRegistry {
             let custom_suffixes = user_file_types
                 .and_then(|types| types.get(language_name.as_ref()))
                 .unwrap_or(&empty);
-            let matching_custom_suffix_len = custom_suffixes
-                .glob
-                .matches(filename)
-                .iter()
-                .filter_map(|i| custom_suffixes.patterns.get(*i))
-                .fold(0, |acc, suffix| acc.max(suffix.len()));
+
+            let matching_custom_suffix_len = {
+                let matches = custom_suffixes.glob.matches(filename);
+
+                if !matches.is_empty() {
+                    // if the glob matched, use the length of its pattern
+                    matches
+                        .iter()
+                        .filter_map(|i| custom_suffixes.patterns.get(*i))
+                        .fold(0, |acc, suffix| acc.max(suffix.len()))
+                } else {
+                    // otherwise try to use the glob patterns as extensions, and
+                    // see if the file ends with any of them
+                    custom_suffixes.patterns.iter().fold(0, |acc, suffix| {
+                        let ext = ".".to_string() + suffix;
+                        if filename.ends_with(&ext) || filename == suffix {
+                            acc.max(suffix.len())
+                        } else {
+                            acc
+                        }
+                    })
+                }
+            };
 
             let content_matches = content.zip(config.first_line_pattern.as_ref()).map_or(
                 false,
@@ -701,9 +721,13 @@ impl LanguageRegistry {
                 },
             );
 
-            if matching_default_suffix_len > 0 || matching_custom_suffix_len > 0 {
-                // in the event of a tie, the user settings should "win" (hence the +1)
-                matching_default_suffix_len.max(matching_custom_suffix_len + 1)
+            // dbg!(&matching_custom_suffix_len);
+            // dbg!(&matching_default_suffix_len);
+
+            if matching_custom_suffix_len > 0 {
+                matching_custom_suffix_len + 1
+            } else if matching_default_suffix_len > 0 {
+                matching_default_suffix_len
             } else if content_matches {
                 1
             } else {
