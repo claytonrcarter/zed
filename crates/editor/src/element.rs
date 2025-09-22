@@ -68,7 +68,7 @@ use project::{
 };
 use settings::{
     GitGutterSetting, GitHunkStyleSetting, IndentGuideBackgroundColoring, IndentGuideColoring,
-    Settings,
+    MinimapGitHunks, Settings,
 };
 use smallvec::{SmallVec, smallvec};
 use std::{
@@ -5569,6 +5569,9 @@ impl EditorElement {
                 self.style.background,
             ));
 
+            let settings = EditorSettings::get_global(cx);
+            let git_hunk_highlight = settings.minimap.git_hunk_highlight;
+
             if matches!(
                 layout.mode,
                 EditorMode::Full { .. } | EditorMode::Minimap { .. }
@@ -5578,7 +5581,10 @@ impl EditorElement {
                         show_active_line_background,
                         ..
                     } => show_active_line_background,
-                    EditorMode::Minimap { .. } => true,
+                    EditorMode::Minimap { .. } => match git_hunk_highlight {
+                        MinimapGitHunks::Always | MinimapGitHunks::Expanded => true,
+                        MinimapGitHunks::Never => false,
+                    },
                     _ => false,
                 };
                 let mut active_rows = layout.active_rows.iter().peekable();
@@ -5667,6 +5673,84 @@ impl EditorElement {
                     }
                     window.paint_quad(quad);
                 };
+
+                if matches!(layout.mode, EditorMode::Minimap { .. })
+                    && git_hunk_highlight == MinimapGitHunks::Always
+                {
+                    for (hunk, _) in &layout.display_hunks {
+                        let hunk_to_paint = match hunk {
+                            DisplayDiffHunk::Folded { display_row } => Some((
+                                *display_row..*display_row,
+                                cx.theme().colors().version_control_modified,
+                            )),
+                            DisplayDiffHunk::Unfolded {
+                                status,
+                                display_row_range,
+                                ..
+                            } => match status.kind {
+                                DiffHunkStatusKind::Added => Some((
+                                    display_row_range.clone(),
+                                    cx.theme().colors().version_control_added,
+                                )),
+
+                                DiffHunkStatusKind::Modified => Some((
+                                    display_row_range.clone(),
+                                    cx.theme().colors().version_control_modified,
+                                )),
+                                DiffHunkStatusKind::Deleted if !display_row_range.is_empty() => {
+                                    Some((
+                                        display_row_range.clone(),
+                                        cx.theme().colors().version_control_deleted,
+                                    ))
+                                }
+                                DiffHunkStatusKind::Deleted => Some((
+                                    display_row_range.clone(),
+                                    cx.theme().colors().version_control_deleted,
+                                )),
+                            },
+                        };
+
+                        if let Some((hunk_range, background_color)) = hunk_to_paint {
+                            if layout.visible_display_row_range.start > hunk_range.end
+                                || layout.visible_display_row_range.end < hunk_range.start
+                            {
+                                // skip non-visible hunks
+                                continue;
+                            }
+
+                            // Flatten the background color with the editor color to prevent
+                            // elements below transparent hunks from showing through
+                            let flattened_background_color = cx
+                                .theme()
+                                .colors()
+                                .editor_background
+                                .blend(background_color);
+
+                            let hunk_opacity = if cx.theme().appearance().is_light() {
+                                0.16
+                            } else {
+                                // main editor uses 0.12
+                                0.2
+                            };
+
+                            let color = LineHighlight {
+                                background: solid_background(
+                                    flattened_background_color.opacity(hunk_opacity),
+                                ),
+                                border: None,
+                                include_gutter: false,
+                                type_id: None,
+                            };
+
+                            paint_highlight(
+                                hunk_range.start,
+                                hunk_range.end,
+                                color,
+                                Edges::default(),
+                            );
+                        }
+                    }
+                }
 
                 let mut current_paint: Option<(LineHighlight, Range<DisplayRow>, Edges<Pixels>)> =
                     None;

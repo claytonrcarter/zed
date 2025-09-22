@@ -529,6 +529,11 @@
     // 2. "line" or "all" to highlight the current line in the minimap.
     // 3. "gutter" or "none" to not highlight the current line in the minimap.
     "current_line_highlight": null,
+    // When git hunks should be be highlighted in the minimap.
+    // 1. Never highlight git hunks: "never"
+    // 2. Only hightlight hunks that are expanded in the main editor: "expanded"
+    // 3. Always hightlight hunks: "always"
+    "git_hunk_highlight": "expanded",
     // Maximum number of columns to display in the minimap.
     "max_width_columns": 80
   },

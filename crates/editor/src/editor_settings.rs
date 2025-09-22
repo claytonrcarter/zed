@@ -10,7 +10,7 @@ pub use settings::{
     ScrollBeyondLastLine, ScrollbarDiagnostics, SeedQuerySetting, ShowMinimap, SnippetSortOrder,
     VsCodeSettings,
 };
-use settings::{Settings, SettingsContent};
+use settings::{MinimapGitHunks, Settings, SettingsContent};
 use ui::scrollbars::{ScrollbarVisibility, ShowScrollbar};
 
 /// Imports from the VSCode settings at
@@ -94,6 +94,7 @@ pub struct Minimap {
     pub thumb: MinimapThumb,
     pub thumb_border: MinimapThumbBorder,
     pub current_line_highlight: Option<CurrentLineHighlight>,
+    pub git_hunk_highlight: MinimapGitHunks,
     pub max_width_columns: num::NonZeroU32,
 }
 
@@ -220,6 +221,7 @@ impl Settings for EditorSettings {
                 thumb: minimap.thumb.unwrap(),
                 thumb_border: minimap.thumb_border.unwrap(),
                 current_line_highlight: minimap.current_line_highlight,
+                git_hunk_highlight: minimap.git_hunk_highlight.unwrap(),
                 max_width_columns: minimap.max_width_columns.unwrap(),
             },
             gutter: Gutter {

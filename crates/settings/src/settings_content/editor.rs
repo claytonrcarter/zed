@@ -285,6 +285,11 @@ pub struct MinimapContent {
     /// Default: inherits editor line highlights setting
     pub current_line_highlight: Option<CurrentLineHighlight>,
 
+    /// Whether git hunks should always be highlighted in the minimap.
+    ///
+    /// Default: expanded
+    pub git_hunk_highlight: Option<MinimapGitHunks>,
+
     /// Maximum number of columns to display in the minimap.
     ///
     /// Default: 80
@@ -479,6 +484,23 @@ pub enum MinimapThumbBorder {
     LeftOnly,
     /// Displays the thumb without any border.
     None,
+}
+
+/// When to highlight git hunks in the minimap.
+///
+/// Default: expanded
+#[derive(
+    Copy, Clone, Debug, Default, Serialize, Deserialize, JsonSchema, MergeFrom, PartialEq, Eq,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum MinimapGitHunks {
+    /// Always highlight git hunks.
+    Always,
+    /// Highlight git hunks when the hunk is expanded in the main editor.
+    #[default]
+    Expanded,
+    /// Never highlight git hunks.
+    Never,
 }
 
 /// Which diagnostic indicators to show in the scrollbar.
