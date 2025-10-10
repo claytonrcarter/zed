@@ -3410,6 +3410,15 @@ impl BufferSnapshot {
 
     /// Returns the [`LanguageScope`] at the given location.
     pub fn language_scope_at<D: ToOffset>(&self, position: D) -> Option<LanguageScope> {
+        self.language_scope_matching(position, |_| true)
+    }
+
+    /// Returns the first [`LanguageScope`] at the given location that matches the given condition.
+    pub fn language_scope_matching<D: ToOffset, F: Fn(&LanguageScope) -> bool>(
+        &self,
+        position: D,
+        predicate: F,
+    ) -> Option<LanguageScope> {
         let offset = position.to_offset(self);
         let mut scope = None;
         let mut smallest_range_and_depth: Option<(Range<usize>, usize)> = None;
@@ -3448,10 +3457,13 @@ impl BufferSnapshot {
                 )
             {
                 smallest_range_and_depth = Some((range, layer.depth));
-                scope = Some(LanguageScope {
+                let maybe_scope = LanguageScope {
                     language: layer.language.clone(),
                     override_id: layer.override_id(offset, &self.text),
-                });
+                };
+                if predicate(&maybe_scope) {
+                    scope = Some(maybe_scope);
+                }
             }
         }
 

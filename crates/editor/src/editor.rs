@@ -4482,7 +4482,13 @@ impl Editor {
                         let start = selection.start;
                         let end = selection.end;
                         let selection_is_empty = start == end;
-                        let language_scope = buffer.language_scope_at(start);
+                        let language_scope = buffer.language_scope_matching(start, |scope| {
+                            scope
+                                .documentation_comment()
+                                .or(scope.block_comment())
+                                .is_some()
+                                || !scope.line_comment_prefixes().is_empty()
+                        });
                         let (
                             comment_delimiter,
                             doc_delimiter,
@@ -12069,7 +12075,13 @@ impl Editor {
             };
 
             let language_settings = buffer.language_settings_at(selection.head(), cx);
-            let language_scope = buffer.language_scope_at(selection.head());
+            let language_scope = buffer.language_scope_matching(selection.head(), |scope| {
+                scope
+                    .documentation_comment()
+                    .or(scope.block_comment())
+                    .is_some()
+                    || !scope.line_comment_prefixes().is_empty()
+            });
 
             let indent_and_prefix_for_row =
                 |row: u32| -> (IndentSize, Option<CommentFormat>, Option<String>) {
@@ -14913,9 +14925,10 @@ impl Editor {
                 let start_column = snapshot
                     .indent_size_for_line(MultiBufferRow(selection.start.row))
                     .len;
-                let language = if let Some(language) =
-                    snapshot.language_scope_at(Point::new(selection.start.row, start_column))
-                {
+                let language = if let Some(language) = snapshot.language_scope_matching(
+                    Point::new(selection.start.row, start_column),
+                    |language| !language.line_comment_prefixes().is_empty(),
+                ) {
                     language
                 } else {
                     continue;

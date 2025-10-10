@@ -5938,6 +5938,15 @@ impl MultiBufferSnapshot {
             .and_then(|(buffer, offset)| buffer.language_scope_at(offset))
     }
 
+    pub fn language_scope_matching<T: ToOffset, F: Fn(&LanguageScope) -> bool>(
+        &self,
+        point: T,
+        predicate: F,
+    ) -> Option<LanguageScope> {
+        self.point_to_buffer_offset(point)
+            .and_then(|(buffer, offset)| buffer.language_scope_matching(offset, predicate))
+    }
+
     pub fn char_classifier_at<T: ToOffset>(&self, point: T) -> CharClassifier {
         self.point_to_buffer_offset(point)
             .map(|(buffer, offset)| buffer.char_classifier_at(offset))
